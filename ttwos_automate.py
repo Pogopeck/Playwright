@@ -2,6 +2,7 @@ from playwright.sync_api import sync_playwright
 import os
 import time
 
+
 def main():
     chrome_path = "C:\\Users\\C.sahooA\\PycharmProjects\\Playwrightdemo\\chrome-win\\chrome.exe"
     combined_cert_path = "C:\\Users\\C.sahooA\\PycharmProjects\\Playwrightdemo\\combined_certificates.crt"
@@ -26,6 +27,9 @@ def main():
             )
             page = browser.new_page()
 
+            # Set up dialog handler
+            page.on("dialog", lambda dialog: dialog.accept())
+
             # Navigate to the login page
             print("Navigating to login page...")
             page.goto("https://myttwos.vf-de.corp.vodafone.com/arsys/shared/login.jsp")
@@ -39,8 +43,8 @@ def main():
             page.evaluate('document.querySelector("#pwd-id").value = ""')
 
             # Type the credentials slowly
-            page.type("#username-id", "chandan.sahoo1", delay=100)
-            page.type("#pwd-id", "Laxmipe!234", delay=100)
+            page.type("#username-id", "piyush.kalbande1", delay=100)
+            page.type("#pwd-id", "Kalki#1988Kalki#1988", delay=100)
             print("Credentials entered")
 
             # Ensure the login button is visible and clickable
@@ -50,13 +54,41 @@ def main():
             # Click login and wait for navigation
             page.click('#login', force=True)
             print("Login button clicked")
+
+            # Wait for a moment to ensure popup appears
+            time.sleep(2)
+
+            try:
+                # Wait for and handle the popup
+                print("Looking for popup...")
+                # Try to find the popup iframe if it exists
+                popup_frame = page.frame_locator('iframe').first
+                if popup_frame:
+                    print("Found popup iframe")
+                    popup_frame.locator('#PopupMsgFooter > a').click(timeout=5000)
+                    print("Clicked Ok button on popup")
+
+            except Exception as popup_error:
+                print(f"Popup handling error: {str(popup_error)}")
+                try:
+                    page.click('text=OK', timeout=5000)
+                except Exception as alt_error:
+                    print(f"Alternative popup handling failed: {str(alt_error)}")
+            # click on inc
+            page.click('#WIN_0_641000070 > div.OuterTabsDiv > div.TabsViewPort > div > dl > dd:nth-child(3) > span.Tab > a')
+            page.click('#WIN_0_641000124 > div.btntextdiv > div')
+
             time.sleep(5)
-            page.wait_for_selector('//*[@id="PopupMsgFooter"]/a', state='visible')
-            page.locator('//*[@id="PopupMsgFooter"]/a').click()
+            # Click to logout before closing browser
+            page.click('#WIN_0_536870888 > div.btntextdiv > div')
+
             # Wait for navigation to complete
             page.wait_for_load_state('networkidle')
             print("Navigation after login completed")
+
+            # Additional wait to ensure page is fully loaded
             time.sleep(5)
+
             # Check for error messages
             if page.query_selector('.error-message'):
                 error_message = page.query_selector('.error-message').inner_text()
@@ -72,6 +104,7 @@ def main():
         finally:
             if 'browser' in locals():
                 browser.close()
+
 
 if __name__ == "__main__":
     main()
