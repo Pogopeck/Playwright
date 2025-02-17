@@ -2,6 +2,10 @@ import logging
 import os
 import asyncio
 from playwright.async_api import async_playwright
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
 
 # Configure logging
 logging.basicConfig(
@@ -15,7 +19,47 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+async def send_email_with_screenshots():
+    """Send an email with attached screenshots."""
+    try:
+        # Email configuration
+        smtp_server = "139.7.95.72"
+        sender_email = "DENM02V@Vodafone.com"
+        receiver_email = "chandan.sahoo@vodafone.com"
+        subject = "Automation Screenshots"
+        body = "Please find attached screenshots from the automation run."
+
+        # Create the email message
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = receiver_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+
+        # Attach screenshots
+        screenshot_files = ['homepage.png', 'new_project.png']
+
+        for screenshot in screenshot_files:
+            if os.path.exists(screenshot):
+                with open(screenshot, 'rb') as f:
+                    img_data = f.read()
+                    image = MIMEImage(img_data, name=os.path.basename(screenshot))
+                    msg.attach(image)
+                    logger.info(f"Attached {screenshot} to email")
+            else:
+                logger.warning(f"Screenshot {screenshot} not found")
+
+        # Send the email
+        with smtplib.SMTP(smtp_server) as server:
+            server.send_message(msg)
+            logger.info("Email sent successfully")
+
+    except Exception as e:
+        logger.error(f"Failed to send email: {str(e)}")
+
+
 async def main():
+    """Main function to execute the automation."""
     chrome_path = "C:\\Users\\C.sahooA\\PycharmProjects\\Playwrightdemo\\chrome-win\\chrome.exe"
     combined_cert_path = "C:\\Users\\C.sahooA\\PycharmProjects\\Playwrightdemo\\cramer_combine.crt"
 
@@ -145,18 +189,18 @@ async def main():
                 await page.screenshot(path="new_project.png")
                 logger.info("Took new_project icon screenshot")
 
+                # Send email with screenshots
+                await send_email_with_screenshots()
+
             except Exception as e:
-                logger.error(f"Error while interacting with outer container: {str(e)}")
-                raise
-
+                logger.error(f"Error occurred: {str(e)}", exc_info=True)
+            finally:
+                if 'browser' in locals():
+                    logger.info("Closing browser")
+                    await browser.close()
+                    logger.info("Browser closed successfully")
     except Exception as e:
-        logger.error(f"Error occurred: {str(e)}", exc_info=True)
-
-    finally:
-        if 'browser' in locals():
-            logger.info("Closing browser")
-            await browser.close()
-            logger.info("Browser closed successfully")
+        logger.error(f"Outer error occurred: {str(e)}", exc_info=True)
 
 
 if __name__ == "__main__":
