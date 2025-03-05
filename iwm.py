@@ -6,6 +6,11 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
+import pytest
+from PIL import Image
+import sys
+from io import StringIO
+import datetime
 
 # Configure logging
 logging.basicConfig(
@@ -18,16 +23,69 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Constants
+SCREENSHOT_DIR = os.path.dirname(os.path.abspath(__file__))
+EXPECTED_FILES = ['homepage.png', 'new_project.png']
 
-async def send_email_with_screenshots():
-    """Send an email with attached screenshots."""
+
+class TestResults:
+    def __init__(self):
+        self.output = StringIO()
+        self.test_passed = False
+
+
+def run_screenshot_tests():
+    """Run pytest tests and capture the output"""
+    test_results = TestResults()
+
+    class Plugin:
+        def pytest_runtest_logreport(self, report):
+            if report.when == 'call':
+                test_results.output.write(f"\n{report.nodeid}: {report.outcome}\n")
+                if report.outcome == "failed":
+                    test_results.output.write(f"    {report.longrepr}\n")
+
+    # Define test functions
+    def test_screenshot_files_exist():
+        for filename in EXPECTED_FILES:
+            file_path = os.path.join(SCREENSHOT_DIR, filename)
+            assert os.path.exists(file_path), f"Screenshot {filename} does not exist"
+
+    def test_screenshot_files_not_empty():
+        for filename in EXPECTED_FILES:
+            file_path = os.path.join(SCREENSHOT_DIR, filename)
+            file_size = os.path.getsize(file_path)
+            assert file_size > 0, f"Screenshot {filename} is empty"
+
+    def test_screenshot_files_are_valid_images():
+        for filename in EXPECTED_FILES:
+            file_path = os.path.join(SCREENSHOT_DIR, filename)
+            try:
+                with Image.open(file_path) as img:
+                    assert img.format == "PNG", f"{filename} is not a PNG file"
+                    width, height = img.size
+                    assert width > 0 and height > 0, f"{filename} has invalid dimensions"
+            except Exception as e:
+                pytest.fail(f"Failed to open {filename} as an image: {str(e)}")
+
+    # Run the tests
+    pytest.main(["-v", "--tb=short"], plugins=[Plugin()])
+    return test_results.output.getvalue()
+
+
+async def send_email_with_screenshots_and_test_results(test_results):
+    """Send an email with attached screenshots and test results."""
     try:
         # Email configuration
         smtp_server = "139.7.95.72"
-        sender_email = "DENM02V@Vodafone.com"
-        receiver_email = "chandan.sahoo@vodafone.com"
-        subject = "Automation Screenshots"
-        body = "Please find attached screenshots from the automation run."
+        sender_email = "Playwright"
+        receiver_email = "voisaodecramer@vodafone.com"
+        subject = f"Automation Screenshots and Test Results - {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+
+        # Create email body with test results
+        body = "Automation Test Results:\n\n"
+        body += test_results
+        body += "\n\nPlease find attached screenshots from the automation run."
 
         # Create the email message
         msg = MIMEMultipart()
@@ -37,13 +95,12 @@ async def send_email_with_screenshots():
         msg.attach(MIMEText(body, 'plain'))
 
         # Attach screenshots
-        screenshot_files = ['homepage.png', 'new_project.png']
-
-        for screenshot in screenshot_files:
-            if os.path.exists(screenshot):
-                with open(screenshot, 'rb') as f:
+        for screenshot in EXPECTED_FILES:
+            file_path = os.path.join(SCREENSHOT_DIR, screenshot)
+            if os.path.exists(file_path):
+                with open(file_path, 'rb') as f:
                     img_data = f.read()
-                    image = MIMEImage(img_data, name=os.path.basename(screenshot))
+                    image = MIMEImage(img_data, name=os.path.basename(file_path))
                     msg.attach(image)
                     logger.info(f"Attached {screenshot} to email")
             else:
@@ -52,7 +109,7 @@ async def send_email_with_screenshots():
         # Send the email
         with smtplib.SMTP(smtp_server) as server:
             server.send_message(msg)
-            logger.info("Email sent successfully")
+            logger.info("Email sent successfully with test results")
 
     except Exception as e:
         logger.error(f"Failed to send email: {str(e)}")
@@ -158,6 +215,12 @@ async def main():
                                 await create_project_button.click()
                                 logger.info("Clicked 'Create New Project' button successfully")
                                 await asyncio.sleep(5)
+                                await page.screenshot(path="new_project1.png")
+                                calender_button = target_frame.locator('.subElementHolder.plannedCompletionDateField')
+                                await calender_button.click()
+                                logger.info("Clicked 'Calender' button successfully")
+                                await page.screenshot(path="calender.png")
+                                await asyncio.sleep(5)
 
                             except Exception as e:
                                 logger.error(f"Failed to interact with create-project-icon: {str(e)}")
@@ -189,8 +252,12 @@ async def main():
                 await page.screenshot(path="new_project.png")
                 logger.info("Took new_project icon screenshot")
 
-                # Send email with screenshots
-                await send_email_with_screenshots()
+                # After taking screenshots, run tests and send email
+                logger.info("Running screenshot tests...")
+                test_results = run_screenshot_tests()
+
+                # Send email with both screenshots and test results
+                await send_email_with_screenshots_and_test_results(test_results)
 
             except Exception as e:
                 logger.error(f"Error occurred: {str(e)}", exc_info=True)
