@@ -11,6 +11,10 @@ from PIL import Image
 import sys
 from io import StringIO
 import datetime
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
@@ -26,6 +30,25 @@ logger = logging.getLogger(__name__)
 # Constants
 SCREENSHOT_DIR = os.path.dirname(os.path.abspath(__file__))
 EXPECTED_FILES = ['homepage.png', 'new_project.png']
+
+
+def validate_environment():
+    """Validate all required environment variables are set"""
+    required_vars = [
+        'CRAMER_USERNAME',
+        'CRAMER_PASSWORD',
+        'SMTP_SERVER',
+        'SMTP_SENDER',
+        'SMTP_RECEIVER',
+        'CHROME_PATH',
+        'CERT_PATH'
+    ]
+
+    missing_vars = [var for var in required_vars if not os.environ.get(var)]
+    if missing_vars:
+        logger.error(f"Missing required environment variables: {', '.join(missing_vars)}")
+        return False
+    return True
 
 
 class TestResults:
@@ -68,7 +91,6 @@ def run_screenshot_tests():
             except Exception as e:
                 pytest.fail(f"Failed to open {filename} as an image: {str(e)}")
 
-    # Run the tests
     pytest.main(["-v", "--tb=short"], plugins=[Plugin()])
     return test_results.output.getvalue()
 
@@ -76,18 +98,15 @@ def run_screenshot_tests():
 async def send_email_with_screenshots_and_test_results(test_results):
     """Send an email with attached screenshots and test results."""
     try:
-        # Email configuration
-        smtp_server = "139.7.95.72"
-        sender_email = "Playwright"
-        receiver_email = "voisaodecramer@vodafone.com"
+        smtp_server = os.environ['SMTP_SERVER']
+        sender_email = os.environ['SMTP_SENDER']
+        receiver_email = os.environ['SMTP_RECEIVER']
         subject = f"Automation Screenshots and Test Results - {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 
-        # Create email body with test results
         body = "Automation Test Results:\n\n"
         body += test_results
         body += "\n\nPlease find attached screenshots from the automation run."
 
-        # Create the email message
         msg = MIMEMultipart()
         msg['From'] = sender_email
         msg['To'] = receiver_email
@@ -106,8 +125,9 @@ async def send_email_with_screenshots_and_test_results(test_results):
             else:
                 logger.warning(f"Screenshot {screenshot} not found")
 
-        # Send the email
+        # Send the email with TLS
         with smtplib.SMTP(smtp_server) as server:
+            server.starttls()
             server.send_message(msg)
             logger.info("Email sent successfully with test results")
 
@@ -117,8 +137,12 @@ async def send_email_with_screenshots_and_test_results(test_results):
 
 async def main():
     """Main function to execute the automation."""
-    chrome_path = "C:\\Users\\C.sahooA\\PycharmProjects\\Playwrightdemo\\chrome-win\\chrome.exe"
-    combined_cert_path = "C:\\Users\\C.sahooA\\PycharmProjects\\Playwrightdemo\\cramer_combine.crt"
+    if not validate_environment():
+        logger.error("Environment validation failed")
+        return
+
+    chrome_path = os.environ['CHROME_PATH']
+    combined_cert_path = os.environ['CERT_PATH']
 
     # Verify Chrome and certificate exist
     if not os.path.exists(chrome_path):
@@ -152,10 +176,10 @@ async def main():
             await page.goto("http://cramerstart.vodafone.com:8670/AmdocsOSS/Portal/index.html")
             await asyncio.sleep(3)
 
-            # Handle login
-            await page.keyboard.type('hp_som_int_iwm')
+            # Handle login with environment variables
+            await page.keyboard.type(os.environ['CRAMER_USERNAME'])
             await page.keyboard.press('Tab')
-            await page.keyboard.type('Welcome1')
+            await page.keyboard.type(os.environ['CRAMER_PASSWORD'])
             await page.keyboard.press('Enter')
             await asyncio.sleep(3)
             await page.screenshot(path="homepage.png")
