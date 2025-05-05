@@ -128,7 +128,21 @@ async def main():
                                 await search_input.fill('B001')
                                 await search_input.press('Enter')
                                 logger.info("Successfully entered 'B001' in search field and pressed Enter")
-                                await asyncio.sleep(5)
+                                await page.get_by_text("empty frame").content_frame.locator(
+                                    ".jqx-grid-cell-all-amdocs-search-not-selected").first.click()
+                                await page.get_by_text("empty frame").content_frame.locator(
+                                    "[id=\"\\39 51\"]").get_by_role("img").click()
+                                await page.get_by_text("empty frame").content_frame.get_by_role("menuitem",
+                                                                                                name="Logical Device Reporter").click()
+                                await page.get_by_text("empty frame").content_frame.locator(
+                                    "#wizard-title-icons div").nth(2).click()
+                                await page.get_by_text("empty frame").content_frame.locator(
+                                    "#wizard-title-icons div").nth(3).click()
+                                await page.get_by_text("empty frame").content_frame.get_by_role("button",
+                                                                                                name="Location").click()
+                                await asyncio.sleep(2)
+                                await page.get_by_text("Logout").click()
+                                await asyncio.sleep(2)
                             except Exception as e:
                                 logger.error(f"Failed to interact with ann-search-16x16-icon-black: {str(e)}")
 
