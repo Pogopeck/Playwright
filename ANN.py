@@ -39,8 +39,8 @@ async def main():
                 executable_path=edge_path,
                 headless=False
             )
-
             page = await browser.new_page()
+            await page.set_viewport_size({"width": 1800, "height": 730})
             logger.info("Browser launched successfully")
 
             # Set up dialog handler
@@ -134,6 +134,8 @@ async def main():
                                     "[id=\"\\39 51\"]").get_by_role("img").click()
                                 await page.get_by_text("empty frame").content_frame.get_by_role("menuitem",
                                                                                                 name="Logical Device Reporter").click()
+                                await asyncio.sleep(5)
+                                await page.screenshot(path="LDR.png")
                                 await page.get_by_text("empty frame").content_frame.locator(
                                     "#wizard-title-icons div").nth(2).click()
                                 await page.get_by_text("empty frame").content_frame.locator(
