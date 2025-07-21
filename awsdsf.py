@@ -26,7 +26,7 @@ async def main():
 
         # Enter password
         await page.get_by_role("textbox", name="Geben Sie das Kennwort für \"").click()
-        await page.get_by_role("textbox", name="Geben Sie das Kennwort für \"").fill("Python@Deco!23456")
+        await page.get_by_role("textbox", name="Geben Sie das Kennwort für \"").fill("HEllo")
         await page.get_by_role("button", name="Anmelden").click()
 
         # Handle additional prompts
