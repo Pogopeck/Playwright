@@ -2,6 +2,7 @@ import os
 import asyncio
 import logging
 from playwright.async_api import async_playwright
+import win32com.client as win32
 
 # === Configure Logging ===
 logging.basicConfig(
@@ -15,7 +16,8 @@ async def main():
     edge_path = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(executable_path=edge_path, headless=False)
+        os.environ["DEBUG"] = "pw:api"
+        browser = await p.chromium.launch(executable_path=edge_path, headless=True)
         context = await browser.new_context()
         page = await context.new_page()
 
@@ -129,7 +131,171 @@ async def main():
             eks_result = f"❌ Error checking 'Aktiv' status: {e}"
 
         print(eks_result)
+        await page.get_by_role("link", name="Link zu vfde-prod-dsf-").click()
+        await page.get_by_test_id("cluster-resources-tab").click()
+        await page.get_by_role("button", name="Namespace auswählen All").click()
+        await page.get_by_text("pega").first.click()
 
+        # === Validate the pod count ===
+        logging.info("Validating pod count")
+        try:
+            # Wait for the Workloads section to appear (adjust selector as needed)
+            await page.wait_for_timeout(5000)  # Allow time for data to load
+
+            # Use a flexible locator to find any "Pods (X)" text
+            pod_text_locator = page.locator("text=Pods (").first
+
+            # Wait explicitly for the element to be available and visible
+            await pod_text_locator.wait_for(state="visible", timeout=30000)
+            full_text = await pod_text_locator.text_content()
+            logging.info(f"Found pod count text: {full_text}")
+
+            # Extract the number using regex
+            import re
+            match = re.search(r"Pods\s*\((\d+)\)", full_text)
+            if not match:
+                pod_count_result = "❌ Could not parse pod count from text."
+                logging.warning(pod_count_result)
+                print(pod_count_result)
+            else:
+                pod_count = int(match.group(1))
+                if pod_count == 4:
+                    pod_count_result = "✅  Pod count is correct: 4"
+                    logging.info(pod_count_result)
+                    print(pod_count_result)
+                else:
+                    pod_count_result = f"❌ Expected 4 pods, but found: {pod_count}"
+                    logging.warning(pod_count_result)
+                    print(pod_count_result)
+
+        except Exception as e:
+            pod_count_result = f"❌ Error validating pod count: {type(e).__name__}: {e}"
+            logging.error(pod_count_result)
+            print(pod_count_result)
+
+
+        # === Navigate to S3 ===
+        await page.get_by_test_id("awsc-concierge-input").click()
+        await page.get_by_test_id("awsc-concierge-input").fill("S3")
+        await page.get_by_test_id("services-search-result-link-s3").click()
+        await page.get_by_role("link", name="-file-transfer").click()
+        await page.get_by_role("link", name="fif_transfer/").click()
+        #await page.pause()
+        # === Check for .xml files in fif_transfer/ folder ===
+        logging.info("Checking for .xml files in fif_transfer/ folder")
+
+        try:
+            await page.wait_for_timeout(5000)
+            file_elements = await page.locator("a[href*='fif_transfer/']").all_text_contents()
+            xml_files = [file for file in file_elements if file.endswith(".xml")]
+
+            if xml_files:
+                s3_result = ", ".join(xml_files)
+            else:
+                s3_result = "OK"
+
+            print(f"S3 Result: {s3_result}")
+            logging.info(f"S3 Result: {s3_result}")
+
+        except Exception as e:
+            s3_result = f"Error checking S3 folder contents: {e}"
+            print(s3_result)
+            logging.error(s3_result)
+
+            #logging.info(s3_result)
+
+        except Exception as e:
+            s3_result = f"❌ Error checking S3 folder contents: {e}"
+            print(s3_result)
+            logging.error(s3_result)
+        import win32com.client as win32
+
+        # Replace these with your actual results
+        ec2_status = "5 INSTANCES"
+        ec2_result = "OK"
+
+        rds_status = "DEPDSF"
+        rds_result = "OK"
+
+        eks_status = "ACTIVE"
+        eks_result = "OK"
+
+        pods_status = "4"
+        pods_result = "OK"
+
+        s3_status = "FIF files"
+        s3_result = ", ".join(xml_files) if xml_files else "OK"
+
+        # Construct the HTML body
+        html_body = f"""
+        <html>
+        <head>
+            <style>
+                table {{
+                    border-collapse: collapse;
+                    width: 60%;
+                }}
+                th, td {{
+                    border: 1px solid black;
+                    padding: 8px;
+                    text-align: center;
+                }}
+                th {{
+                    background-color: #f2f2f2;
+                }}
+            </style>
+        </head>
+        <body>
+            <h2>AWS Validation Report</h2>
+            <table>
+                <tr>
+                    <th>AWS</th>
+                    <th>Service</th>
+                    <th>Status</th>
+                    <th>Result</th>
+                </tr>
+                <tr>
+                    <td rowspan="5">AWS</td>
+                    <td>EC2</td>
+                    <td>{ec2_status}</td>
+                    <td>{ec2_result}</td>
+                </tr>
+                <tr>
+                    <td>RDS</td>
+                    <td>{rds_status}</td>
+                    <td>{rds_result}</td>
+                </tr>
+                <tr>
+                    <td>CLUSTER</td>
+                    <td>{eks_status}</td>
+                    <td>{eks_result}</td>
+                </tr>
+                <tr>
+                    <td>PODS</td>
+                    <td>{pods_status}</td>
+                    <td>{pods_result}</td>
+                </tr>
+                <tr>
+                    <td>S3</td>
+                    <td>{s3_status}</td>
+                    <td>{s3_result}</td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        """
+
+        # Send the email
+        outlook = win32.Dispatch('outlook.application')
+        mail = outlook.CreateItem(0)
+        mail.To = "chandan.sahoo1@vodafone.com"  # Replace with actual recipient
+        mail.Subject = "AWS Sanity Report"
+        mail.HTMLBody = html_body
+        mail.Send()
+
+        print("✅  Email sent successfully.")
+
+        await page.pause()
         await browser.close()
         logging.info("Browser closed")
 
