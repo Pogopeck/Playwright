@@ -68,32 +68,41 @@ def send_teams_notification(title, message):
     except Exception as e:
         logging.error(f"Error sending Teams notification: {e}")
 
-
 async def fetch_request_ids(page):
-    """Extract all Request IDs from the table."""
     try:
-        # Wait for the table to be visible and loaded
-        await page.wait_for_selector("table[summary='Overview Console'] tbody tr", timeout=10000)
+        # Wait for the table container to be visible
+        await page.wait_for_selector("#WIN_2_301444200 .BaseTableInner", timeout=20000)
 
-        # Get all rows in the table
-        rows = await page.query_selector_all("table[summary='Overview Console'] tbody tr")
-        request_ids = []
+        # Get the entire container
+        table_container = await page.query_selector("#WIN_2_301444200 .BaseTableInner")
+        if not table_container:
+            raise Exception("Table container not found")
 
-        for row in rows:
-            # Get first cell (Request ID column)
-            cells = await row.query_selector_all("td")
-            if len(cells) > 0:
-                text = await cells[0].inner_text()
-                if text.startswith("INC") or text.startswith("SR"):
-                    request_ids.append(text.strip())
+        # Get all text from container
+        full_text = await table_container.inner_text()
+        logging.debug(f"Raw table text: {full_text[:500]}...")  # Log first 500 chars for debugging
 
+        # Split into words/tokens and find INC/SR
+        request_ids = set()
+        tokens = full_text.split()
+
+        for token in tokens:
+            clean_token = token.strip().rstrip('.,;:')
+            if clean_token.startswith(("INC", "SR")) and len(clean_token) > 6:  # e.g., INC00123
+                request_ids.add(clean_token)
+
+        request_ids = list(request_ids)
         logging.info(f"Found {len(request_ids)} request IDs: {request_ids}")
         return request_ids
 
     except Exception as e:
         logging.error(f"Error fetching request IDs: {e}")
+        await page.screenshot(path="fetch_error_v2.png")
+        html = await page.content()
+        with open("fetch_error_v2.html", "w", encoding="utf-8") as f:
+            f.write(html)
+        logging.info("Debug files saved: fetch_error_v2.png, fetch_error_v2.html")
         return []
-
 
 async def login_and_navigate(page):
     """Handle login and navigation to filtered view."""
