@@ -25,8 +25,6 @@ async def extract_package_details_from_description(page):
     Returns dict: { "CN_000900": { "PackageName": "DSF_..." } }
     """
     selectors = [
-        'div[data-test-id="issue.views.issue-base.ui.description.description-container"]',
-        '.description-content',
         '#description-val',
         '[data-field-id="description"]',
         'div#descriptionmodule .user-content',
@@ -72,7 +70,7 @@ async def main():
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             executable_path=edge_path,
-            headless=False
+            headless=True
         )
         context = await browser.new_context(locale='en-US')
         page = await context.new_page()
@@ -86,13 +84,6 @@ async def main():
         await page.get_by_role("textbox", name="Enter the password for").fill(jpass)
         await page.get_by_role("button", name="Sign in").click()
         await page.get_by_role("button", name="No").click()
-
-        # Handle post-login prompt (if any)
-        try:
-            await page.wait_for_selector('button:has-text("No")', timeout=5000)
-            await page.get_by_role("button", name="No").click()
-        except:
-            print("⏭️  'No' button not found or not needed.")
 
         # Wait for issue page to load
         await page.wait_for_load_state("networkidle")
