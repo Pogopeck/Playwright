@@ -16,8 +16,8 @@ async def main():
     edge_path = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
 
     async with async_playwright() as p:
-        os.environ["DEBUG"] = "pw:api"
-        browser = await p.chromium.launch(executable_path=edge_path, headless=True)
+        #os.environ["DEBUG"] = "pw:api"
+        browser = await p.chromium.launch(executable_path=edge_path, headless=False)
         context = await browser.new_context()
         page = await context.new_page()
 
@@ -74,14 +74,13 @@ async def main():
             instResult = f"❌ Expected '(5)', but found: {text}"
             logging.warning(instResult)
             print(instResult)
-
+        await page.wait_for_timeout(5000)
         # === Navigate to RDS / Aurora ===
         logging.info("Navigating to RDS dashboard")
         await page.get_by_test_id("awsc-concierge-input").fill("RDS")
         await page.get_by_test_id("services-search-result-link-rds").click()
         await page.wait_for_url("**/rds/home**")
-
-
+        await page.wait_for_timeout(5000)
         await page.get_by_role("link", name="Datenbanken").wait_for(timeout=10000)
         await page.get_by_role("link", name="Datenbanken").click()
         logging.info("Clicked on 'Datenbanken' link")
@@ -110,6 +109,7 @@ async def main():
         # === Navigate to EKS ===
         logging.info("Navigating to EKS dashboard")
         await page.get_by_test_id("awsc-concierge-input").fill("EKS")
+        await page.wait_for_timeout(5000)
         await page.get_by_test_id("services-search-result-link-eks").click()
         await page.wait_for_url("**/eks/home**")
         await page.wait_for_timeout(5000)
@@ -173,7 +173,7 @@ async def main():
             logging.error(pod_count_result)
             print(pod_count_result)
 
-
+        await page.wait_for_timeout(5000)
         # === Navigate to S3 ===
         await page.get_by_test_id("awsc-concierge-input").click()
         await page.get_by_test_id("awsc-concierge-input").fill("S3")
@@ -295,7 +295,7 @@ async def main():
 
         print("✅  Email sent successfully.")
 
-        await page.pause()
+        #await page.pause()
         await browser.close()
         logging.info("Browser closed")
 
